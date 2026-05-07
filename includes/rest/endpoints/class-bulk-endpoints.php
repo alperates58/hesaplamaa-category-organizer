@@ -54,6 +54,18 @@ class Bulk_Endpoints {
             'callback'            => [ $this, 'apply_job_suggestions' ],
             'permission_callback' => [ REST_Controller::class, 'permission_manage' ],
         ] );
+
+        register_rest_route( self::NS, '/bulk/fix-parents/preview', [
+            'methods'             => 'GET',
+            'callback'            => [ $this, 'fix_parents_preview' ],
+            'permission_callback' => [ REST_Controller::class, 'permission_manage' ],
+        ] );
+
+        register_rest_route( self::NS, '/bulk/fix-parents/apply', [
+            'methods'             => 'POST',
+            'callback'            => [ $this, 'fix_parents_apply' ],
+            'permission_callback' => [ REST_Controller::class, 'permission_manage' ],
+        ] );
     }
 
     public function get_jobs( \WP_REST_Request $request ): \WP_REST_Response {
@@ -153,6 +165,55 @@ class Bulk_Endpoints {
             'skipped'  => $skipped,
             'total'    => count( $ids ),
         ], 200 );
+    }
+
+    /** Returns how many posts are missing their parent category. */
+    public function fix_parents_preview( \WP_REST_Request $request ): \WP_REST_Response {
+        $affected = $this->find_posts_missing_parent( dry_run: true );
+        return new \WP_REST_Response( [ 'affected' => count( $affected ) ], 200 );
+    }
+
+    /** Adds the parent category to every post that only has a subcategory. */
+    public function fix_parents_apply( \WP_REST_Request $request ): \WP_REST_Response {
+        $affected = $this->find_posts_missing_parent( dry_run: false );
+        return new \WP_REST_Response( [ 'fixed' => count( $affected ) ], 200 );
+    }
+
+    /**
+     * Finds (and optionally fixes) posts whose category list is missing a parent.
+     * Returns array of post IDs that were/would be affected.
+     */
+    private function find_posts_missing_parent( bool $dry_run ): array {
+        $post_ids = get_posts( [
+            'post_type'        => 'post',
+            'post_status'      => 'publish',
+            'posts_per_page'   => -1,
+            'fields'           => 'ids',
+            'suppress_filters' => false,
+        ] );
+
+        $affected = [];
+
+        foreach ( $post_ids as $post_id ) {
+            $terms   = wp_get_post_categories( $post_id, [ 'fields' => 'all' ] );
+            $cat_ids = array_map( fn( $t ) => (int) $t->term_id, $terms );
+            $to_add  = [];
+
+            foreach ( $terms as $term ) {
+                if ( $term->parent && ! in_array( (int) $term->parent, $cat_ids, true ) ) {
+                    $to_add[] = (int) $term->parent;
+                }
+            }
+
+            if ( ! empty( $to_add ) ) {
+                $affected[] = $post_id;
+                if ( ! $dry_run ) {
+                    wp_set_post_categories( $post_id, array_unique( array_merge( $cat_ids, $to_add ) ) );
+                }
+            }
+        }
+
+        return $affected;
     }
 
     public function pause_job( \WP_REST_Request $request ): \WP_REST_Response {

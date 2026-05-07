@@ -161,7 +161,14 @@ class Category_Analyzer {
 
         if ( ! $cat_id ) return false;
 
-        $result = wp_set_post_categories( $post_id, [ $cat_id ] );
+        // Assign both the subcategory AND its parent so WP category hierarchy works correctly
+        $cats = [ $cat_id ];
+        $term = get_term( $cat_id, 'category' );
+        if ( $term && ! is_wp_error( $term ) && $term->parent ) {
+            $cats[] = $term->parent;
+        }
+
+        $result = wp_set_post_categories( $post_id, array_unique( $cats ) );
         if ( is_wp_error( $result ) ) return false;
 
         $this->db->update_suggestion( $suggestion_id, [

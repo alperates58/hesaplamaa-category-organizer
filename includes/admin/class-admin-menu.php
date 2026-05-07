@@ -26,7 +26,6 @@ final class Admin_Menu {
         $pages = [
             [ 'hco-dashboard',    __( 'Dashboard', 'hesaplamaa-category-organizer' ) ],
             [ 'hco-ai-assistant', __( 'AI Assistant', 'hesaplamaa-category-organizer' ) ],
-            [ 'hco-bulk',         __( 'Bulk Analysis', 'hesaplamaa-category-organizer' ) ],
             [ 'hco-suggestions',  __( 'Suggestions', 'hesaplamaa-category-organizer' ) ],
             [ 'hco-clusters',     __( 'SEO Clusters', 'hesaplamaa-category-organizer' ) ],
             [ 'hco-audit-log',    __( 'Audit Log', 'hesaplamaa-category-organizer' ) ],
@@ -129,6 +128,20 @@ final class Admin_Menu {
             <h1>⚡ Toplu Analiz & Onay</h1>
             <p class="sub">Yazılarınızı AI ile analiz edin, önerileri gözden geçirip onaylayın.</p>
 
+            <!-- Fix Parents Banner -->
+            <div id="hbr-fix-banner" class="hbr-box" style="border-left:4px solid #dba617;display:none">
+                <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+                    <div style="flex:1">
+                        <strong style="color:#1d2327">⚠️ Üst Kategori Eksikliği Tespit Edildi</strong>
+                        <p id="hbr-fix-desc" style="margin:4px 0 0;font-size:13px;color:#646970"></p>
+                    </div>
+                    <button id="hbr-fix-btn" style="padding:8px 18px;background:#dba617;border:none;border-radius:4px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">
+                        Üst Kategorileri Ekle
+                    </button>
+                    <span id="hbr-fix-status" style="font-size:13px;color:#646970"></span>
+                </div>
+            </div>
+
             <!-- Step 1: Setup -->
             <div id="hbr-setup" class="hbr-box">
                 <h2>İş Türü Seçin</h2>
@@ -218,6 +231,35 @@ final class Admin_Menu {
 
             const $ = id => document.getElementById(id);
             let jobId      = null;
+
+            // ── Fix Parents Banner ────────────────────────────────────────
+            fetch(REST_URL + '/bulk/fix-parents/preview', { headers: { 'X-WP-Nonce': NONCE } })
+            .then(r => r.json())
+            .then(data => {
+                if (data.affected > 0) {
+                    $('hbr-fix-desc').textContent =
+                        data.affected + ' yazı sadece alt kategoride kayıtlı — üst kategorileri eksik.';
+                    $('hbr-fix-banner').style.display = 'block';
+                }
+            }).catch(() => {});
+
+            $('hbr-fix-btn').addEventListener('click', () => {
+                $('hbr-fix-btn').disabled = true;
+                $('hbr-fix-status').textContent = 'Düzeltiliyor...';
+                fetch(REST_URL + '/bulk/fix-parents/apply', {
+                    method: 'POST',
+                    headers: { 'X-WP-Nonce': NONCE, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                })
+                .then(r => r.json())
+                .then(res => {
+                    $('hbr-fix-banner').style.borderColor = '#00a32a';
+                    $('hbr-fix-btn').style.display = 'none';
+                    $('hbr-fix-desc').textContent  = '✅ ' + res.fixed + ' yazıya üst kategori eklendi.';
+                    $('hbr-fix-status').textContent = '';
+                })
+                .catch(e => { $('hbr-fix-status').textContent = 'Hata: ' + e.message; $('hbr-fix-btn').disabled=false; });
+            });
             let pollTimer  = null;
             let allRows    = [];   // { id, post_title, current, parent, child, confidence, intent, visible }
 
