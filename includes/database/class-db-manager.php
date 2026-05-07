@@ -259,6 +259,31 @@ final class DB_Manager {
         );
     }
 
+    public function get_suggestions_by_time_range( string $from, string $to ): array {
+        global $wpdb;
+        return $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT s.*,
+                        p.post_title,
+                        p.guid          AS post_url,
+                        cc.name         AS current_cat_name,
+                        sc.name         AS suggested_cat_name_resolved,
+                        pc.name         AS suggested_parent_name_resolved
+                 FROM {$wpdb->prefix}hco_suggestions s
+                 LEFT JOIN {$wpdb->posts} p  ON p.ID          = s.post_id
+                 LEFT JOIN {$wpdb->terms} cc ON cc.term_id    = s.current_cat_id
+                 LEFT JOIN {$wpdb->terms} sc ON sc.term_id    = s.suggested_cat_id
+                 LEFT JOIN {$wpdb->terms} pc ON pc.term_id    = s.suggested_parent_id
+                 WHERE s.created_at >= %s AND s.created_at <= %s
+                   AND s.status = 'pending'
+                 ORDER BY s.confidence DESC",
+                $from,
+                $to
+            ),
+            ARRAY_A
+        ) ?: [];
+    }
+
     public function get_bulk_jobs( int $limit = 20 ): array {
         global $wpdb;
         return $wpdb->get_results(

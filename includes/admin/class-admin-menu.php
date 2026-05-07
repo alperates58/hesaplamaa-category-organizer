@@ -47,6 +47,15 @@ final class Admin_Menu {
 
         add_submenu_page(
             'hco-dashboard',
+            __( 'Toplu Analiz & Onay', 'hesaplamaa-category-organizer' ),
+            __( '⚡ Toplu Analiz & Onay', 'hesaplamaa-category-organizer' ),
+            'manage_categories',
+            'hco-bulk-review',
+            [ $this, 'render_bulk_review' ]
+        );
+
+        add_submenu_page(
+            'hco-dashboard',
             __( 'Excel İçe Aktar', 'hesaplamaa-category-organizer' ),
             __( '📥 Excel İçe Aktar', 'hesaplamaa-category-organizer' ),
             'manage_categories',
@@ -57,6 +66,357 @@ final class Admin_Menu {
 
     public function render_app(): void {
         echo '<div id="hco-root" class="hco-app-root"></div>';
+    }
+
+    public function render_bulk_review(): void {
+        $nonce    = wp_create_nonce( 'wp_rest' );
+        $rest_url = esc_js( rest_url( 'hco/v1' ) );
+        ?>
+        <style>
+        .hbr{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;max-width:1200px;padding:20px 0}
+        .hbr h1{font-size:22px;font-weight:700;margin-bottom:6px;color:#1d2327}
+        .hbr .sub{color:#646970;font-size:14px;margin:0 0 24px}
+        .hbr-box{background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:24px;margin-bottom:20px}
+        .hbr-box h2{font-size:15px;font-weight:700;margin:0 0 16px;color:#1d2327}
+        .hbr-radio{display:flex;flex-direction:column;gap:10px}
+        .hbr-radio label{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border:1px solid #dcdcde;border-radius:6px;cursor:pointer;transition:border-color .15s,background .15s}
+        .hbr-radio label:hover{border-color:#2271b1;background:#f0f6fc}
+        .hbr-radio input[type=radio]{margin-top:2px;flex-shrink:0}
+        .hbr-radio input[type=radio]:checked + .hbr-radio-text{color:#1d2327}
+        .hbr-radio label:has(input:checked){border-color:#2271b1;background:#f0f6fc}
+        .hbr-radio-title{font-weight:600;font-size:14px;color:#1d2327}
+        .hbr-radio-desc{font-size:12px;color:#646970;margin-top:2px}
+        #hbr-start-btn{margin-top:18px;padding:10px 24px;background:#2271b1;border:none;border-radius:4px;color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+        #hbr-start-btn:hover{background:#135e96}
+        #hbr-start-btn:disabled{background:#c3c4c7;cursor:not-allowed}
+        .hbr-progress-wrap{margin-top:20px}
+        .hbr-prog-label{font-size:14px;color:#1d2327;margin-bottom:8px;font-weight:600}
+        .hbr-prog-sub{font-size:12px;color:#646970;margin-bottom:12px}
+        .hbr-prog-bar{height:8px;background:#dcdcde;border-radius:4px;overflow:hidden}
+        .hbr-prog-bar-inner{height:100%;background:#2271b1;border-radius:4px;transition:width .4s ease}
+        .hbr-spinner{display:inline-block;width:14px;height:14px;border:2px solid #dcdcde;border-top-color:#2271b1;border-radius:50%;animation:hbr-spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+        @keyframes hbr-spin{to{transform:rotate(360deg)}}
+        .hbr-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+        .hbr-toolbar select,.hbr-toolbar input[type=range]{border:1px solid #dcdcde;border-radius:4px;padding:5px 10px;font-size:13px}
+        .hbr-toolbar label{font-size:13px;color:#646970}
+        .hbr-sel-btn{padding:5px 12px;border:1px solid #dcdcde;background:#fff;border-radius:4px;font-size:12px;cursor:pointer}
+        .hbr-sel-btn:hover{background:#f6f7f7}
+        .hbr-count-label{margin-left:auto;font-size:13px;color:#646970}
+        .hbr-table-wrap{max-height:520px;overflow-y:auto;border:1px solid #dcdcde;border-radius:6px}
+        .hbr-table{width:100%;border-collapse:collapse;font-size:13px}
+        .hbr-table th{background:#f6f7f7;padding:9px 12px;text-align:left;border-bottom:1px solid #dcdcde;position:sticky;top:0;z-index:1;font-weight:600;white-space:nowrap}
+        .hbr-table th.chk{width:40px;text-align:center}
+        .hbr-table td{padding:8px 12px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+        .hbr-table tr:last-child td{border-bottom:none}
+        .hbr-table tr.hidden-row{display:none}
+        .hbr-table td.chk{text-align:center}
+        .conf-bar{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+        .conf-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+        .conf-high{background:#00a32a}.conf-mid{background:#dba617}.conf-low{background:#d63638}
+        .cat-arrow{color:#646970;margin:0 4px}
+        .hbr-apply-bar{display:flex;align-items:center;gap:14px;margin-top:18px;flex-wrap:wrap}
+        #hbr-apply-btn{padding:10px 24px;background:#00a32a;border:none;border-radius:4px;color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+        #hbr-apply-btn:hover{background:#007017}
+        #hbr-apply-btn:disabled{background:#c3c4c7;cursor:not-allowed}
+        .hbr-result{padding:16px 20px;border-radius:6px;font-size:14px;line-height:1.7}
+        .hbr-result.ok{background:#d1e7dd;color:#0a3622;border:1px solid #a3cfbb}
+        .hbr-result.err{background:#f8d7da;color:#58151c;border:1px solid #f1aeb5}
+        .hbr-new-btn{margin-top:14px;padding:8px 16px;background:#fff;border:1px solid #dcdcde;border-radius:4px;font-size:13px;cursor:pointer}
+        .hbr-empty{padding:40px;text-align:center;color:#646970;font-size:14px}
+        </style>
+
+        <div class="hbr wrap">
+            <h1>⚡ Toplu Analiz & Onay</h1>
+            <p class="sub">Yazılarınızı AI ile analiz edin, önerileri gözden geçirip onaylayın.</p>
+
+            <!-- Step 1: Setup -->
+            <div id="hbr-setup" class="hbr-box">
+                <h2>İş Türü Seçin</h2>
+                <div class="hbr-radio">
+                    <label>
+                        <input type="radio" name="job_type" value="categorize_uncategorized" checked>
+                        <div class="hbr-radio-text">
+                            <div class="hbr-radio-title">Kategorisiz Yazıları Kategorile</div>
+                            <div class="hbr-radio-desc">Varsayılan/kategorisiz kategorideki yazıları analiz et</div>
+                        </div>
+                    </label>
+                    <label>
+                        <input type="radio" name="job_type" value="recategorize_all">
+                        <div class="hbr-radio-text">
+                            <div class="hbr-radio-title">Tüm Yazıları Yeniden Kategorile</div>
+                            <div class="hbr-radio-desc">Yayınlanmış tüm yazıları yeniden analiz et</div>
+                        </div>
+                    </label>
+                    <label>
+                        <input type="radio" name="job_type" value="detect_orphans">
+                        <div class="hbr-radio-text">
+                            <div class="hbr-radio-title">Sahipsiz Yazıları Tespit Et</div>
+                            <div class="hbr-radio-desc">Hiç kategorisi atanmamış yazıları bul ve kategorile</div>
+                        </div>
+                    </label>
+                </div>
+                <button id="hbr-start-btn">▶ Analizi Başlat</button>
+            </div>
+
+            <!-- Step 2: Progress -->
+            <div id="hbr-progress" class="hbr-box" style="display:none">
+                <h2><span class="hbr-spinner"></span> Analiz Ediliyor</h2>
+                <div class="hbr-prog-label" id="hbr-prog-label">Başlatılıyor...</div>
+                <div class="hbr-prog-sub" id="hbr-prog-sub">Bu işlem birkaç dakika sürebilir.</div>
+                <div class="hbr-prog-bar"><div class="hbr-prog-bar-inner" id="hbr-prog-inner" style="width:0%"></div></div>
+            </div>
+
+            <!-- Step 3: Review -->
+            <div id="hbr-review" class="hbr-box" style="display:none">
+                <h2 id="hbr-review-title">Öneriler</h2>
+
+                <div class="hbr-toolbar">
+                    <button class="hbr-sel-btn" id="hbr-sel-all">✓ Tümünü Seç</button>
+                    <button class="hbr-sel-btn" id="hbr-sel-none">✗ Seçimi Kaldır</button>
+                    <label>Güven ≥ <strong id="hbr-conf-val">70</strong>%
+                        <input type="range" id="hbr-conf-range" min="0" max="100" value="70" style="width:100px;vertical-align:middle">
+                    </label>
+                    <label>Ana Kategori:
+                        <select id="hbr-parent-filter"><option value="">Tümü</option></select>
+                    </label>
+                    <span class="hbr-count-label" id="hbr-count-label"></span>
+                </div>
+
+                <div class="hbr-table-wrap">
+                    <table class="hbr-table">
+                        <thead>
+                            <tr>
+                                <th class="chk"><input type="checkbox" id="hbr-chk-master" checked></th>
+                                <th>Yazı Başlığı</th>
+                                <th>Mevcut Kategori</th>
+                                <th>Önerilen Kategori</th>
+                                <th>Güven</th>
+                                <th>SEO Niyet</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hbr-tbody"></tbody>
+                    </table>
+                </div>
+
+                <div class="hbr-apply-bar">
+                    <button id="hbr-apply-btn" disabled>Seçilenleri Uygula</button>
+                    <span id="hbr-apply-label" style="font-size:13px;color:#646970"></span>
+                </div>
+            </div>
+
+            <!-- Step 4: Result -->
+            <div id="hbr-result-box" style="display:none">
+                <div id="hbr-result-msg"></div>
+                <button class="hbr-new-btn" onclick="location.reload()">← Yeni Analiz Başlat</button>
+            </div>
+        </div>
+
+        <script>
+        (function(){
+            const NONCE    = '<?php echo esc_js( $nonce ); ?>';
+            const REST_URL = '<?php echo $rest_url; ?>';
+
+            const $ = id => document.getElementById(id);
+            let jobId      = null;
+            let pollTimer  = null;
+            let allRows    = [];   // { id, post_title, current, parent, child, confidence, intent, visible }
+
+            // ── Step 1: Start Job ────────────────────────────────────────
+            $('hbr-start-btn').addEventListener('click', () => {
+                const jobType = document.querySelector('input[name="job_type"]:checked').value;
+                $('hbr-start-btn').disabled = true;
+
+                fetch(REST_URL + '/bulk/jobs', {
+                    method: 'POST',
+                    headers: { 'X-WP-Nonce': NONCE, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_type: jobType }),
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.job_id) { alert('İş oluşturulamadı.'); $('hbr-start-btn').disabled=false; return; }
+                    jobId = data.job_id;
+                    $('hbr-setup').style.display    = 'none';
+                    $('hbr-progress').style.display = 'block';
+                    pollTimer = setInterval(pollJob, 3000);
+                    pollJob();
+                })
+                .catch(e => { alert('Hata: ' + e.message); $('hbr-start-btn').disabled=false; });
+            });
+
+            // ── Step 2: Poll Job Status ───────────────────────────────────
+            function pollJob() {
+                fetch(REST_URL + '/bulk/jobs/' + jobId, { headers: { 'X-WP-Nonce': NONCE } })
+                .then(r => r.json())
+                .then(job => {
+                    const total     = parseInt(job.total_items) || 0;
+                    const processed = parseInt(job.processed_items) || 0;
+                    const pct       = total > 0 ? Math.round((processed / total) * 100) : 0;
+
+                    $('hbr-prog-inner').style.width = pct + '%';
+                    $('hbr-prog-label').textContent =
+                        processed + ' / ' + total + ' yazı analiz edildi (' + pct + '%)';
+                    $('hbr-prog-sub').textContent =
+                        job.status === 'running' ? 'İşleniyor...' :
+                        job.status === 'queued'  ? 'Kuyrukta bekliyor...' :
+                        job.status === 'completed' ? 'Tamamlandı!' : job.status;
+
+                    if (job.status === 'completed') {
+                        clearInterval(pollTimer);
+                        loadSuggestions();
+                    } else if (job.status === 'failed') {
+                        clearInterval(pollTimer);
+                        $('hbr-prog-label').textContent = '❌ İş başarısız oldu.';
+                    }
+                })
+                .catch(() => {});
+            }
+
+            // ── Step 3: Load & Render Suggestions ─────────────────────────
+            function loadSuggestions() {
+                fetch(REST_URL + '/bulk/jobs/' + jobId + '/suggestions', { headers: { 'X-WP-Nonce': NONCE } })
+                .then(r => r.json())
+                .then(data => {
+                    $('hbr-progress').style.display = 'none';
+
+                    if (!data.suggestions || data.suggestions.length === 0) {
+                        $('hbr-review').style.display = 'block';
+                        $('hbr-tbody').innerHTML =
+                            '<tr><td colspan="6" class="hbr-empty">Onaylanacak öneri bulunamadı. Tüm yazılar zaten kategorize edilmiş olabilir.</td></tr>';
+                        return;
+                    }
+
+                    // Build rows
+                    allRows = data.suggestions.map(s => ({
+                        id:         parseInt(s.id),
+                        post_title: s.post_title || '(Başlıksız)',
+                        post_url:   s.post_url   || '#',
+                        current:    s.current_cat_name || '—',
+                        parent:     s.suggested_parent_name_resolved || s.suggested_parent_name || '—',
+                        child:      s.suggested_cat_name_resolved    || s.suggested_cat_name    || '—',
+                        conf:       parseInt(s.confidence) || 0,
+                        intent:     s.seo_intent   || '',
+                        reasoning:  s.ai_reasoning || '',
+                    }));
+
+                    // Populate parent filter
+                    const parents = [...new Set(allRows.map(r => r.parent))].sort();
+                    const sel = $('hbr-parent-filter');
+                    parents.forEach(p => {
+                        const o = document.createElement('option');
+                        o.value = p; o.textContent = p;
+                        sel.appendChild(o);
+                    });
+
+                    $('hbr-review-title').textContent =
+                        'Öneriler — ' + allRows.length + ' yazı analiz edildi';
+                    $('hbr-review').style.display = 'block';
+
+                    renderTable();
+                    updateApplyBtn();
+                });
+            }
+
+            function renderTable() {
+                const minConf  = parseInt($('hbr-conf-range').value);
+                const parentF  = $('hbr-parent-filter').value;
+                const tbody    = $('hbr-tbody');
+                tbody.innerHTML = '';
+                let visible = 0;
+
+                allRows.forEach(row => {
+                    const show = row.conf >= minConf && (!parentF || row.parent === parentF);
+                    const confCls = row.conf >= 80 ? 'conf-high' : row.conf >= 60 ? 'conf-mid' : 'conf-low';
+                    const tr = document.createElement('tr');
+                    tr.dataset.id   = row.id;
+                    tr.dataset.conf = row.conf;
+                    if (!show) tr.classList.add('hidden-row');
+                    else visible++;
+
+                    tr.innerHTML =
+                        `<td class="chk"><input type="checkbox" class="hbr-chk" data-id="${row.id}" ${show ? 'checked' : ''}></td>
+                         <td><a href="${row.post_url}" target="_blank" style="color:#2271b1;text-decoration:none" title="${row.reasoning}">${row.post_title}</a></td>
+                         <td style="color:#646970">${row.current}</td>
+                         <td><strong>${row.parent}</strong><span class="cat-arrow">›</span>${row.child}</td>
+                         <td><span class="conf-bar"><span class="conf-dot ${confCls}"></span>${row.conf}%</span></td>
+                         <td style="color:#646970;font-size:12px">${row.intent}</td>`;
+                    tbody.appendChild(tr);
+                });
+
+                $('hbr-count-label').textContent = visible + ' öneri gösteriliyor';
+                updateApplyBtn();
+            }
+
+            function updateApplyBtn() {
+                const checked = document.querySelectorAll('.hbr-chk:checked').length;
+                $('hbr-apply-btn').disabled   = checked === 0;
+                $('hbr-apply-btn').textContent = checked > 0
+                    ? checked + ' Yazıyı Kategorile'
+                    : 'Seçilenleri Uygula';
+                $('hbr-apply-label').textContent = checked > 0
+                    ? checked + ' yazı seçili'
+                    : 'Uygulamak için en az bir yazı seçin.';
+            }
+
+            // Filters
+            $('hbr-conf-range').addEventListener('input', e => {
+                $('hbr-conf-val').textContent = e.target.value;
+                renderTable();
+            });
+            $('hbr-parent-filter').addEventListener('change', renderTable);
+
+            // Master checkbox
+            $('hbr-chk-master').addEventListener('change', e => {
+                document.querySelectorAll('.hbr-chk').forEach(c => {
+                    if (!c.closest('tr').classList.contains('hidden-row')) c.checked = e.target.checked;
+                });
+                updateApplyBtn();
+            });
+
+            // Select all / none buttons
+            $('hbr-sel-all').addEventListener('click', () => {
+                document.querySelectorAll('.hbr-chk').forEach(c => {
+                    if (!c.closest('tr').classList.contains('hidden-row')) c.checked = true;
+                });
+                updateApplyBtn();
+            });
+            $('hbr-sel-none').addEventListener('click', () => {
+                document.querySelectorAll('.hbr-chk').forEach(c => c.checked = false);
+                updateApplyBtn();
+            });
+
+            document.addEventListener('change', e => {
+                if (e.target.classList.contains('hbr-chk')) updateApplyBtn();
+            });
+
+            // ── Step 4: Apply ─────────────────────────────────────────────
+            $('hbr-apply-btn').addEventListener('click', () => {
+                const ids = [...document.querySelectorAll('.hbr-chk:checked')].map(c => parseInt(c.dataset.id));
+                if (!ids.length) return;
+
+                $('hbr-apply-btn').disabled    = true;
+                $('hbr-apply-label').textContent = 'Uygulanıyor...';
+
+                fetch(REST_URL + '/bulk/jobs/' + jobId + '/apply', {
+                    method: 'POST',
+                    headers: { 'X-WP-Nonce': NONCE, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids }),
+                })
+                .then(r => r.json())
+                .then(res => {
+                    $('hbr-review').style.display = 'none';
+                    const ok  = !res.error;
+                    const msg = ok
+                        ? `<strong>✅ ${res.applied} yazı başarıyla kategorilendi!</strong><br>` +
+                          (res.skipped > 0 ? res.skipped + ' yazı atlandı.' : '')
+                        : `<strong>❌ Hata:</strong> ${res.error}`;
+                    $('hbr-result-msg').innerHTML = `<div class="hbr-result ${ok?'ok':'err'}">${msg}</div>`;
+                    $('hbr-result-box').style.display = 'block';
+                })
+                .catch(e => { alert('Hata: ' + e.message); $('hbr-apply-btn').disabled = false; });
+            });
+        })();
+        </script>
+        <?php
     }
 
     public function render_excel_import(): void {
