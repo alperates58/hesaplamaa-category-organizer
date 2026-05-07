@@ -26,6 +26,7 @@ final class Admin_Menu {
         $pages = [
             [ 'hco-dashboard',    __( 'Dashboard', 'hesaplamaa-category-organizer' ) ],
             [ 'hco-ai-assistant', __( 'AI Assistant', 'hesaplamaa-category-organizer' ) ],
+            [ 'hco-bulk',         __( 'Bulk Analysis', 'hesaplamaa-category-organizer' ) ],
             [ 'hco-suggestions',  __( 'Suggestions', 'hesaplamaa-category-organizer' ) ],
             [ 'hco-clusters',     __( 'SEO Clusters', 'hesaplamaa-category-organizer' ) ],
             [ 'hco-audit-log',    __( 'Audit Log', 'hesaplamaa-category-organizer' ) ],
@@ -43,15 +44,6 @@ final class Admin_Menu {
                 [ $this, 'render_app' ]
             );
         }
-
-        add_submenu_page(
-            'hco-dashboard',
-            __( 'Toplu Analiz & Onay', 'hesaplamaa-category-organizer' ),
-            __( '⚡ Toplu Analiz & Onay', 'hesaplamaa-category-organizer' ),
-            'manage_categories',
-            'hco-bulk-review',
-            [ $this, 'render_bulk_review' ]
-        );
 
         add_submenu_page(
             'hco-dashboard',
