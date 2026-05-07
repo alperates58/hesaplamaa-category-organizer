@@ -9,6 +9,7 @@ use HCO\REST\Endpoints\Bulk_Endpoints;
 use HCO\REST\Endpoints\Settings_Endpoints;
 use HCO\REST\Endpoints\Analytics_Endpoints;
 use HCO\REST\Endpoints\GitHub_Endpoints;
+use HCO\REST\Endpoints\Import_Endpoints;
 
 final class REST_Controller {
 
@@ -26,6 +27,7 @@ final class REST_Controller {
         ( new Settings_Endpoints() )->register();
         ( new Analytics_Endpoints() )->register();
         ( new GitHub_Endpoints() )->register();
+        ( new Import_Endpoints() )->register();
     }
 
     public static function permission_manage(): bool {
