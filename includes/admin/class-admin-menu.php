@@ -57,6 +57,69 @@ final class Admin_Menu {
 
     public function render_app(): void {
         echo '<div id="hco-root" class="hco-app-root"></div>';
+
+        if ( ( $_GET['page'] ?? '' ) === 'hco-bulk' ) {
+            $this->render_fix_parents_widget();
+        }
+    }
+
+    private function render_fix_parents_widget(): void {
+        $nonce    = wp_create_nonce( 'wp_rest' );
+        $rest_url = esc_js( rest_url( 'hco/v1' ) );
+        ?>
+        <div id="hco-fp-widget" style="
+            position:fixed;bottom:24px;right:24px;z-index:9999;
+            background:#fff;border:1px solid #dcdcde;border-radius:8px;
+            box-shadow:0 4px 16px rgba(0,0,0,.12);padding:16px 20px;
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+            font-size:13px;max-width:300px;display:none">
+            <div style="font-weight:700;color:#1d2327;margin-bottom:6px">⚠️ Üst Kategori Eksikliği</div>
+            <div id="hco-fp-desc" style="color:#646970;margin-bottom:12px;line-height:1.5"></div>
+            <div style="display:flex;gap:8px;align-items:center">
+                <button id="hco-fp-btn" style="padding:7px 14px;background:#dba617;border:none;border-radius:4px;color:#fff;font-weight:600;cursor:pointer;font-size:13px">
+                    Üst Kategorileri Ekle
+                </button>
+                <span id="hco-fp-status" style="color:#646970;font-size:12px"></span>
+            </div>
+        </div>
+        <script>
+        (function(){
+            const NONCE    = '<?php echo esc_js( $nonce ); ?>';
+            const REST_URL = '<?php echo $rest_url; ?>';
+            const widget   = document.getElementById('hco-fp-widget');
+            const btn      = document.getElementById('hco-fp-btn');
+            const desc     = document.getElementById('hco-fp-desc');
+            const status   = document.getElementById('hco-fp-status');
+
+            fetch(REST_URL + '/bulk/fix-parents/preview', { headers: { 'X-WP-Nonce': NONCE } })
+            .then(r => r.json())
+            .then(data => {
+                if (data.affected > 0) {
+                    desc.textContent = data.affected + ' yazı sadece alt kategoride kayıtlı, üst kategorileri eksik.';
+                    widget.style.display = 'block';
+                }
+            }).catch(() => {});
+
+            btn.addEventListener('click', () => {
+                btn.disabled = true;
+                status.textContent = 'Düzeltiliyor...';
+                fetch(REST_URL + '/bulk/fix-parents/apply', {
+                    method: 'POST',
+                    headers: { 'X-WP-Nonce': NONCE, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                })
+                .then(r => r.json())
+                .then(res => {
+                    widget.style.borderColor = '#00a32a';
+                    btn.style.display        = 'none';
+                    desc.textContent         = '✅ ' + res.fixed + ' yazıya üst kategori eklendi.';
+                    status.textContent       = '';
+                })
+                .catch(e => { status.textContent = 'Hata: ' + e.message; btn.disabled = false; });
+            });
+        })();
+        </script>
+        <?php
     }
 
     public function render_bulk_review(): void {

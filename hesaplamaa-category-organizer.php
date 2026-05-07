@@ -3,7 +3,7 @@
  * Plugin Name: Hesaplamaa Category Organizer
  * Plugin URI:  https://hesaplamaa.com
  * Description: AI-powered taxonomy architecture and SEO content structure platform for large-scale content websites.
- * Version:     1.3.0
+ * Version:     1.4.0
  * Author:      Hesaplamaa
  * Author URI:  https://hesaplamaa.com
  * Text Domain: hesaplamaa-category-organizer
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'HCO_VERSION',     '1.3.0' );
+define( 'HCO_VERSION',     '1.4.0' );
 define( 'HCO_FILE',        __FILE__ );
 define( 'HCO_PATH',        plugin_dir_path( __FILE__ ) );
 define( 'HCO_URL',         plugin_dir_url( __FILE__ ) );
