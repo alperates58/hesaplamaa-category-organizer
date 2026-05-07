@@ -259,6 +259,29 @@ final class DB_Manager {
         );
     }
 
+    public function get_active_bulk_job( string $job_type, array $statuses = [ 'queued', 'running', 'paused' ] ): ?array {
+        global $wpdb;
+
+        if ( empty( $statuses ) ) {
+            return null;
+        }
+
+        $placeholders = implode( ',', array_fill( 0, count( $statuses ), '%s' ) );
+        $params       = array_merge( [ $job_type ], $statuses );
+
+        return $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}hco_bulk_jobs
+                 WHERE job_type = %s
+                   AND status IN ($placeholders)
+                 ORDER BY created_at DESC
+                 LIMIT 1",
+                ...$params
+            ),
+            ARRAY_A
+        );
+    }
+
     public function get_suggestions_by_time_range( string $from, string $to ): array {
         global $wpdb;
         return $wpdb->get_results(

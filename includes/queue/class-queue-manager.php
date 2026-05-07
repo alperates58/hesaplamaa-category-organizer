@@ -23,6 +23,15 @@ final class Queue_Manager {
     public function create_bulk_job( string $job_type, array $settings = [] ): int {
         $db = DB_Manager::get_instance();
 
+        $existing_job = $db->get_active_bulk_job( $job_type, [ 'queued', 'running' ] );
+        if ( $existing_job ) {
+            if ( in_array( $existing_job['status'], [ 'queued', 'running' ], true ) ) {
+                $this->schedule_job( (int) $existing_job['id'], 2 );
+            }
+
+            return (int) $existing_job['id'];
+        }
+
         $query_args = $this->build_query_args( $job_type, $settings );
         $total      = (int) ( new \WP_Query( array_merge( $query_args, [ 'fields' => 'ids', 'posts_per_page' => -1, 'no_found_rows' => false ] ) ) )->found_posts;
 
@@ -34,7 +43,7 @@ final class Queue_Manager {
         ] );
 
         if ( $job_id ) {
-            wp_schedule_single_event( time() + 5, 'hco_bulk_analysis', [ $job_id ] );
+            $this->schedule_job( (int) $job_id, 5 );
         }
 
         return (int) $job_id;
@@ -44,11 +53,14 @@ final class Queue_Manager {
         $db  = DB_Manager::get_instance();
         $job = $db->get_bulk_job( $job_id );
 
-        if ( ! $job || $job['status'] === 'paused' || $job['status'] === 'completed' ) return;
+        if ( ! $job || in_array( $job['status'], [ 'paused', 'completed', 'failed' ], true ) ) {
+            $this->clear_scheduled_job( $job_id );
+            return;
+        }
 
         $db->update_bulk_job( $job_id, [
             'status'     => 'running',
-            'started_at' => current_time( 'mysql' ),
+            'started_at' => $job['started_at'] ?: current_time( 'mysql' ),
         ] );
 
         $settings = json_decode( $job['settings'], true ) ?: [];
@@ -71,6 +83,7 @@ final class Queue_Manager {
                 'status'       => 'completed',
                 'completed_at' => current_time( 'mysql' ),
             ] );
+            $this->clear_scheduled_job( $job_id );
             return;
         }
 
@@ -101,14 +114,27 @@ final class Queue_Manager {
         ] );
 
         if ( ! $is_done ) {
-            wp_schedule_single_event( time() + 2, 'hco_bulk_analysis', [ $job_id ] );
+            $current_job = $db->get_bulk_job( $job_id );
+
+            if ( $current_job && ! in_array( $current_job['status'], [ 'paused', 'completed', 'failed' ], true ) ) {
+                $this->schedule_job( $job_id, 2 );
+            } else {
+                $this->clear_scheduled_job( $job_id );
+            }
+        } else {
+            $this->clear_scheduled_job( $job_id );
         }
     }
 
     public function pause_job( int $job_id ): bool {
         $db  = DB_Manager::get_instance();
         $job = $db->get_bulk_job( $job_id );
-        if ( ! $job || $job['status'] !== 'running' ) return false;
+        if ( ! $job || ! in_array( $job['status'], [ 'queued', 'running' ], true ) ) {
+            return false;
+        }
+
+        $this->clear_scheduled_job( $job_id );
+
         return $db->update_bulk_job( $job_id, [ 'status' => 'paused' ] );
     }
 
@@ -118,7 +144,7 @@ final class Queue_Manager {
         if ( ! $job || $job['status'] !== 'paused' ) return false;
 
         $db->update_bulk_job( $job_id, [ 'status' => 'queued' ] );
-        wp_schedule_single_event( time() + 2, 'hco_bulk_analysis', [ $job_id ] );
+        $this->schedule_job( $job_id, 2 );
         return true;
     }
 
@@ -146,5 +172,14 @@ final class Queue_Manager {
             ] ),
             default => $base,
         };
+    }
+
+    private function schedule_job( int $job_id, int $delay = 2 ): void {
+        $this->clear_scheduled_job( $job_id );
+        wp_schedule_single_event( time() + max( 1, $delay ), 'hco_bulk_analysis', [ $job_id ] );
+    }
+
+    private function clear_scheduled_job( int $job_id ): void {
+        wp_clear_scheduled_hook( 'hco_bulk_analysis', [ $job_id ] );
     }
 }
