@@ -85,6 +85,7 @@ class Category_Analyzer {
 
         $taxonomy = $this->get_flat_taxonomy();
         $result   = $this->provider->analyze_post( $post_data, $taxonomy );
+        $result   = $this->validate_and_resolve( $result, $taxonomy );
 
         $settings = get_option( 'hco_settings', [] );
         $threshold = absint( $settings['confidence_threshold'] ?? 75 );
@@ -201,6 +202,73 @@ class Category_Analyzer {
         $this->db->update_suggestion( $suggestion_id, [ 'status' => 'rolled_back' ] );
         $this->db->log_audit( 'suggestion_rolled_back', 'post', $post_id );
         return true;
+    }
+
+    /**
+     * Validate AI response against real taxonomy.
+     * Resolves IDs by name if the AI returned wrong/missing IDs.
+     * Forces needs_new_category=false — we never create categories here.
+     */
+    private function validate_and_resolve( array $result, array $taxonomy ): array {
+        // Build fast lookups
+        $by_id   = [];
+        $by_name = [];
+        foreach ( $taxonomy as $cat ) {
+            $by_id[ $cat['id'] ]                       = $cat;
+            $by_name[ mb_strtolower( $cat['name'] ) ]  = $cat;
+        }
+
+        // Resolve subcategory
+        $sub_id   = (int) ( $result['subcategory']['id'] ?? 0 );
+        $sub_name = mb_strtolower( trim( $result['subcategory']['name'] ?? '' ) );
+
+        if ( $sub_id && isset( $by_id[ $sub_id ] ) ) {
+            $sub = $by_id[ $sub_id ];
+        } elseif ( $sub_name && isset( $by_name[ $sub_name ] ) ) {
+            $sub = $by_name[ $sub_name ];
+        } else {
+            $sub = null;
+        }
+
+        if ( $sub ) {
+            $result['subcategory']['id']   = $sub['id'];
+            $result['subcategory']['name'] = $sub['name'];
+            $result['subcategory']['slug'] = $sub['slug'];
+            $result['subcategory']['is_new'] = false;
+
+            // Auto-fix parent to match the actual parent of the resolved subcategory
+            if ( $sub['parent'] && isset( $by_id[ $sub['parent'] ] ) ) {
+                $parent = $by_id[ $sub['parent'] ];
+                $result['parent_category']['id']   = $parent['id'];
+                $result['parent_category']['name'] = $parent['name'];
+                $result['parent_category']['is_new'] = false;
+            }
+        } else {
+            // Subcategory not found at all — resolve parent and leave sub unmatched
+            $result['subcategory']['id']     = null;
+            $result['subcategory']['is_new'] = false;
+        }
+
+        // Resolve parent independently if sub didn't auto-fix it
+        if ( empty( $result['parent_category']['id'] ) ) {
+            $p_id   = (int) ( $result['parent_category']['id'] ?? 0 );
+            $p_name = mb_strtolower( trim( $result['parent_category']['name'] ?? '' ) );
+
+            if ( $p_id && isset( $by_id[ $p_id ] ) ) {
+                $result['parent_category']['id']   = $p_id;
+                $result['parent_category']['name'] = $by_id[ $p_id ]['name'];
+            } elseif ( $p_name && isset( $by_name[ $p_name ] ) ) {
+                $p = $by_name[ $p_name ];
+                $result['parent_category']['id']   = $p['id'];
+                $result['parent_category']['name'] = $p['name'];
+            }
+            $result['parent_category']['is_new'] = false;
+        }
+
+        // Never allow creating new categories in bulk mode
+        $result['needs_new_category'] = false;
+
+        return $result;
     }
 
     private function find_or_create_parent( string $name ): int {

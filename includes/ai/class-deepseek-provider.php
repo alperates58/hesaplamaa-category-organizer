@@ -40,20 +40,29 @@ class DeepSeek_Provider extends Abstract_Provider {
         $cached    = $this->get_cached_result( $cache_key );
         if ( $cached ) return $cached;
 
-        $taxonomy_ctx = $this->build_taxonomy_context( $taxonomy );
+        $taxonomy_ctx = $this->build_hierarchical_taxonomy_context( $taxonomy );
         $post_ctx     = $this->build_post_context( $post_data );
+
+        $system = 'You are a senior SEO strategist for Turkish content websites. '
+            . 'Assign posts ONLY to EXISTING categories from the provided taxonomy. '
+            . 'NEVER invent new category names or IDs. '
+            . 'parent_category.id must be a top-level (▸) ID; subcategory.id must be its child (└). '
+            . 'Always respond with ONLY valid JSON.';
+
+        $user = "Assign this post to the best EXISTING category.\n\n"
+            . "## Available Taxonomy (use ONLY these IDs):\n{$taxonomy_ctx}\n\n"
+            . "## Post:\n{$post_ctx}\n\n"
+            . "## Output JSON:\n"
+            . '{"parent_category":{"id":<top_level_id>,"name":"<exact_name>"},'
+            . '"subcategory":{"id":<child_id>,"name":"<exact_name>","slug":"<slug>"},'
+            . '"confidence":<0-100>,"seo_intent":"string","needs_new_category":false,'
+            . '"reasoning":"<max 150 chars>","seo_notes":"<max 100 chars>"}';
 
         $response = $this->make_request( [
             'model'    => $this->get_model(),
             'messages' => [
-                [
-                    'role'    => 'system',
-                    'content' => 'You are a senior SEO strategist and taxonomy architect. Always respond with ONLY valid JSON.',
-                ],
-                [
-                    'role'    => 'user',
-                    'content' => "Analyze this post and return the best category assignment as JSON.\n\nExisting taxonomy:\n{$taxonomy_ctx}\n\nPost:\n{$post_ctx}\n\nJSON schema:\n{\"parent_category\":{\"id\":null,\"name\":\"string\",\"is_new\":false},\"subcategory\":{\"id\":null,\"name\":\"string\",\"slug\":\"string\",\"is_new\":false},\"confidence\":0,\"seo_intent\":\"string\",\"needs_new_category\":false,\"reasoning\":\"string\",\"seo_notes\":\"string\"}",
-                ],
+                [ 'role' => 'system', 'content' => $system ],
+                [ 'role' => 'user',   'content' => $user   ],
             ],
             'temperature'     => 0.1,
             'response_format' => [ 'type' => 'json_object' ],

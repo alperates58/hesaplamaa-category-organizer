@@ -37,6 +37,32 @@ abstract class Abstract_Provider implements AI_Provider_Interface {
         return implode( "\n", $lines );
     }
 
+    /**
+     * Hierarchical view: parents with their children listed beneath.
+     * Used in analyze_post prompts so the AI sees exact valid ID/name pairs.
+     */
+    protected function build_hierarchical_taxonomy_context( array $taxonomy ): string {
+        $parents  = [];
+        $children = [];
+
+        foreach ( $taxonomy as $cat ) {
+            if ( ! $cat['parent'] ) {
+                $parents[ $cat['id'] ] = $cat;
+            } else {
+                $children[ $cat['parent'] ][] = $cat;
+            }
+        }
+
+        $lines = [];
+        foreach ( $parents as $pid => $p ) {
+            $lines[] = "▸ [{$p['id']}] {$p['name']}";
+            foreach ( $children[ $pid ] ?? [] as $c ) {
+                $lines[] = "   └ [{$c['id']}] {$c['name']} (slug: {$c['slug']})";
+            }
+        }
+        return implode( "\n", $lines );
+    }
+
     protected function build_post_context( array $post ): string {
         $parts = [];
         if ( ! empty( $post['title'] ) )           $parts[] = "Title: {$post['title']}";

@@ -40,42 +40,38 @@ class OpenAI_Provider extends Abstract_Provider {
         $cached    = $this->get_cached_result( $cache_key );
         if ( $cached ) return $cached;
 
-        $taxonomy_ctx = $this->build_taxonomy_context( $taxonomy );
+        $taxonomy_ctx = $this->build_hierarchical_taxonomy_context( $taxonomy );
         $post_ctx     = $this->build_post_context( $post_data );
 
         $system_prompt = <<<PROMPT
-You are a senior SEO strategist and taxonomy architect specializing in Turkish content websites.
-Your job is to analyze WordPress posts and assign them to the most appropriate categories in a taxonomy.
-You think in terms of topical authority, SEO silos, and semantic hierarchy.
+You are a senior SEO strategist specializing in Turkish content websites.
+Your ONLY job is to assign each WordPress post to the BEST MATCHING category that ALREADY EXISTS in the provided taxonomy.
+CRITICAL RULES:
+- You MUST select ONLY from the IDs and names shown in the taxonomy. Never invent new names or IDs.
+- parent_category.id MUST be a top-level (▸) ID from the list.
+- subcategory.id MUST be a child (└) ID listed under that parent.
+- Never set needs_new_category to true.
 Always output ONLY valid JSON — no explanation outside the JSON.
 PROMPT;
 
         $user_prompt = <<<PROMPT
-Analyze this post and determine the best category assignment.
+Assign this post to the most appropriate EXISTING category.
 
-## Existing Taxonomy:
+## Available Taxonomy (use ONLY these IDs and names):
 {$taxonomy_ctx}
 
-## Post Data:
+## Post:
 {$post_ctx}
 
-## Instructions:
-1. Select the best matching parent category from the existing taxonomy.
-2. Select or suggest the best subcategory (can be existing or new).
-3. Assign a confidence score 0-100.
-4. Identify the SEO intent.
-5. Provide brief reasoning.
-6. If no suitable category exists, set "needs_new_category": true.
-
-## Output JSON schema:
+## Output JSON (all IDs must come from the taxonomy above):
 {
-  "parent_category": { "id": number|null, "name": "string", "is_new": false },
-  "subcategory": { "id": number|null, "name": "string", "slug": "string", "is_new": bool },
-  "confidence": number,
-  "seo_intent": "Informational|Transactional|Navigational|Commercial|Calculation",
-  "needs_new_category": bool,
-  "reasoning": "string (max 150 chars)",
-  "seo_notes": "string (max 100 chars)"
+  "parent_category": { "id": <existing_top_level_id>, "name": "<exact_name>" },
+  "subcategory":     { "id": <existing_child_id>,     "name": "<exact_name>", "slug": "<slug>" },
+  "confidence": <0-100>,
+  "seo_intent": "Informational|Calculation|Transactional|Navigational|Commercial",
+  "needs_new_category": false,
+  "reasoning": "<max 150 chars>",
+  "seo_notes": "<max 100 chars>"
 }
 PROMPT;
 
